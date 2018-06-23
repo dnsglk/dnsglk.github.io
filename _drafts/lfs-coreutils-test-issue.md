@@ -8,26 +8,42 @@ categories: jekyll update
 - [LFS 8.2][lfs-main] 
 - Linux 4.13.0 
 - docker `Docker version 18.03.1-ce, build 9ee9f40`
-- overlayfs2
 - [coreutils-8.29][lfs-coreutils]
 
 ## Issue
-3 tests fail when running `make check`: 
+3 tests fail when running `make check` under docker and 2 return with error. 
 ```
 ============================================================================
 Testsuite summary for GNU coreutils 8.29
 ============================================================================
 # TOTAL: 603
-# PASS:  480
-# SKIP:  121
+# PASS:  460
+# SKIP:  138
 # XFAIL: 0
-# FAIL:  1
+# FAIL:  3
 # XPASS: 0
-# ERROR: 1
+# ERROR: 2
 ============================================================================
 ```
+```
+$ grep -E "(ERROR|FAIL) " tests/test-suite.log
+FAIL tests/tail-2/inotify-dir-recreate.sh (exit status: 1)
+ERROR tests/rm/deep-2.sh (exit status: 99)
+FAIL tests/dd/direct.sh (exit status: 1)
+FAIL tests/dd/sparse.sh (exit status: 1)
+ERROR tests/du/long-from-unreadable.sh (exit status: 99)
+```
+In comparison, running the check on the host doesn't yield any issue.
+
+### Dealing with Errors
+A brief analysis of the problem surfaced a difficulty in aufs driver which tries to operate with file paths longer than PATH_MAX. The obstacle is hidden in the linux security mechanism - AppArmor. It blocks program operations which deal with extremely long paths.
+
+I thought of either try to configure AppArmor so that it can allow the operation, or try other solution with google's help. After failing to find a quick way to tame AppArmor, I found that (of course) somebody faced similar [issues in docker container][app-armor-issue].
+> TODO Learn how to configure AppArmor
+
+### Failed Tests
 #### inotify-dir-recreate
-The idea behind the test is explained inside it's source [script](https://github.com/coreutils/coreutils/blob/v8.29/tests/tail-2/inotify-dir-recreate.sh)
+The idea behind the test according to it's source [script](https://github.com/coreutils/coreutils/blob/v8.29/tests/tail-2/inotify-dir-recreate.sh):
 
 {% highlight bash %}
 #!/bin/sh 
@@ -36,19 +52,33 @@ The idea behind the test is explained inside it's source [script](https://github
 # (...instead of getting stuck forever)
 {% endhighlight %}
 
-The expected outcome `${COREUTILS_DIR}/${TEST_OUT_DIR}/exp` differs from the actual `${COREUTILS_DIR}/${TEST_OUT_DIR}/out`. Errors are not captured via stream redirection, so we need to repeat this test and keep the output.
+To see the output of the test run the command:
 ```
 make check TESTS=tests/tail-2/inotify-dir-recreate KEEP=yes VERBOSE=yes
 ```
+Test fails because it's output is not as expected. It expects:
+``` 
+$ cat gt-inotify-dir-recreate.sh.7W1d/exp
+inotify
+tail: 'dir/file' has become inaccessible: No such file or directory
+tail: directory containing watched file was removed
+tail: inotify cannot be used, reverting to polling
+tail: 'dir/file' has appeared;  following new file
+``` 
+Results contain only the first line which is the standard output. Errors are not captured via stream redirection in my shell in the docker container. To see errors from a program I need to launch it manually. Here is the behavior I get in docker:
 
-Basically, tail should output more info to the console, and apparantely it doesn't do it. And the reason is, that linux inotify API is not used by tail as expected due to the fact that all files inside container are treated as "remote". Before tail-ing there is a check, verifying if the watched file is located on a remote FS, and, yes, overlayfs and aufs which, are used by docker considered as remote. 
+![Coreutils test fail in docker](/assets/img/coreutils-test-fail-in-docker.gif)
 
+The expected behavior can be reproduced on the host. However, the default `tail` in my environment doesn't switch to polling either. So I copied, configured and run `make` to get the `tail` binary from the `coreutils` archive which is used in LFS.
 
+![How it should work](/assets/img/coreutils-should-work.gif)
+
+Basically, `tail` should output more info to the console, and apparently it doesn't do it. And the reason why `tail` is not switching to polling is that linux inotify API is not used by tail as expected. All files inside container are treated as "remote". In the main() of `tail` there is a check, verifying if the watched file is located on a remote FS. If file is remote, than inotify is not used at all, and thus we cannot get that message. 
 
 {% highlight c %}
 if (forever && ignore_fifo_and_pipe (F, n_files))
     {
-
+    ...
 #if HAVE_INOTIFY
         /* tailable_stdin() ...
            ...
@@ -58,7 +88,45 @@ if (forever && ignore_fifo_and_pipe (F, n_files))
            that were not initiated from the local system.
            ...
         */
+         if (!disable_inotify && (tailable_stdin (F, n_files)
+                               || any_remote_file (F, n_files)
+                               || ! any_non_remote_file (F, n_files)
+                               || any_symlinks (F, n_files)
+                               || any_non_regular_fifo (F, n_files)
+                               || (!ok && follow_mode == Follow_descriptor)))
+            disable_inotify = true;
+
+      if (!disable_inotify)
+        {
+          int wd = inotify_init ();
+          if (0 <= wd)
+            {
+              ...
+              if (! tail_forever_inotify (wd, F, n_files, sleep_interval))
+                return EXIT_FAILURE;
+            }
+          error (0, errno, _("inotify cannot be used, reverting to polling"));
+          ...
+        }
+#endif
+      disable_inotify = true;
+      tail_forever (F, n_files, sleep_interval);
+    }
+    ...
+}
 {% endhighlight %}
+
+`overlayfs2` and `aufs`, which are used by docker, are considered as remote FS. Look at the [tail.c](https://github.com/coreutils/coreutils/blob/v8.29/src/tail.c#L2039) and locally generated file `fs-is-local.h`.
+
+# ... continue 
+1. Explain what is polling, brief inotify documentation 
+2. inotifywait example with removal -> explains why file removal should switch to polling
 
 [lfs-main]:        http://www.linuxfromscratch.org/lfs/
 [lfs-coreutils]:   http://www.linuxfromscratch.org/lfs/view/stable/chapter05/coreutils.html
+[app-armor-issue]: https://github.com/moby/moby/issues/13451
+----
+### References
+- [LFS][lfs-main]
+- [Coreutils](https://github.com/coreutils/coreutils/)
+- [AppArmor and docker issue][app-armor-issue]
