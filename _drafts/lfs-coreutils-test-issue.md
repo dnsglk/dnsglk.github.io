@@ -17,8 +17,8 @@ categories: jekyll update
 Testsuite summary for GNU coreutils 8.29
 ============================================================================
 # TOTAL: 603
-# PASS:  460
-# SKIP:  138
+# PASS:  459
+# SKIP:  139
 # XFAIL: 0
 # FAIL:  3
 # XPASS: 0
@@ -35,11 +35,34 @@ ERROR tests/du/long-from-unreadable.sh (exit status: 99)
 ```
 In comparison, running the check on the host doesn't yield any issue.
 
+*Did you know?* that there is a project which automates the LFS build? And there is a [comment](https://github.com/reinterpretcat/lfs/blob/master/scripts/prepare/5.19-make-coreutils.sh#L9) telling that `coreutils`'s tests fail. [ε-(´・｀) ﾌ](http://www.fastemoji.com/%CE%B5-(%C2%B4%E3%83%BB%EF%BD%80)-%EF%BE%8C-Meaning-Emoji-Emoticon-Phew!-Ascii-Art-Relieved-Grateful-Phew-Japanese-Kaomoji-Smileys-141.html) at least I am not alone!
+
 ### Dealing with Errors
 A brief analysis of the problem surfaced a difficulty in aufs driver which tries to operate with file paths longer than PATH_MAX. The obstacle is hidden in the linux security mechanism - AppArmor. It blocks program operations which deal with extremely long paths.
 
-I thought of either try to configure AppArmor so that it can allow the operation, or try other solution with google's help. After failing to find a quick way to tame AppArmor, I found that (of course) somebody faced similar [issues in docker container][app-armor-issue].
+BTW, the issue also manifests itself during the configuretion step:
+```
+$ ./configure --prefix=/tools --enable-install-program=hostname
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether build environment is sane... yes
+...
+# a lot of output
+...
+config.status: creating po/Makefile
+rm: cannot remove 'confdir3/confdir3/confdir3/.../confdir3': File name too long
+```
+I thought of either trying to configure AppArmor so that it can allow the operation, or ... try other solution with google's help. After failing to find a quick way to tame AppArmor, I found that (of course) somebody faced similar [issues in docker container][app-armor-issue].
 > TODO Learn how to configure AppArmor
+
+Here is the [documentation][docker-overlay2] how to change docker storage driver. Don't forget to enter extra command to make the backup. 
+After changing the driver some of failed tests are passing.
+
+```
+$ grep -E "(ERROR|FAIL) " tests/test-suite.log  
+FAIL tests/tail-2/inotify-dir-recreate.sh (exit status: 1)
+ERROR tests/rm/deep-2.sh (exit status: 99)
+ERROR tests/du/long-from-unreadable.sh (exit status: 99)
+```
 
 ### Failed Tests
 #### inotify-dir-recreate
@@ -125,6 +148,7 @@ if (forever && ignore_fifo_and_pipe (F, n_files))
 [lfs-main]:        http://www.linuxfromscratch.org/lfs/
 [lfs-coreutils]:   http://www.linuxfromscratch.org/lfs/view/stable/chapter05/coreutils.html
 [app-armor-issue]: https://github.com/moby/moby/issues/13451
+[docker-overlay2]: https://docs.docker.com/storage/storagedriver/overlayfs-driver/#configure-docker-with-the-overlay-or-overlay2-storage-driver
 ----
 ### References
 - [LFS][lfs-main]
