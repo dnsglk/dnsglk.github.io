@@ -1,14 +1,22 @@
 ---
-layout: post
-title:  "LFS in docker. Coreutils issues"
-date:   2018-06-23 14:35:30 +0200
-categories: jekyll update
+layout: 	post
+title:  	"LFS. Coreutils issues."
+date:   	2018-06-23 14:35:30 +0200
+categories: 	lfs
+tags:		[LFS, lfs, linux, docker]
 ---
 ### Prerequisites 
 - [LFS 8.2][lfs-main] 
 - Linux 4.13.0 
 - docker `Docker version 18.03.1-ce, build 9ee9f40`
 - [coreutils-8.29][lfs-coreutils]
+
+## Intro
+TL;DR just go to [Conclusions](#conclusions) section.
+
+This post is about a lesson learned from *NOT* learning the docker's [official documentation][docker-storage] before starting doing something with it!
+
+To understand what's happening first read [this post]({{ site.baseurl }}{% link _drafts/lfs-kickoff.md %}).
 
 ## Issue
 3 tests fail when running `make check` under docker and 2 return with error. 
@@ -35,14 +43,21 @@ ERROR tests/du/long-from-unreadable.sh (exit status: 99)
 ```
 In comparison, running the check on the host doesn't yield any issue.
 
-*Did you know?* that there is a project which automates the LFS build? And there is a [comment](https://github.com/reinterpretcat/lfs/blob/master/scripts/prepare/5.19-make-coreutils.sh#L9) telling that `coreutils`'s tests fail. [ε-(´・｀) ﾌ](http://www.fastemoji.com/%CE%B5-(%C2%B4%E3%83%BB%EF%BD%80)-%EF%BE%8C-Meaning-Emoji-Emoticon-Phew!-Ascii-Art-Relieved-Grateful-Phew-Japanese-Kaomoji-Smileys-141.html) at least I am not alone!
+*Did you know?* that there is a project which automates the LFS build? And there is a [comment](https://github.com/reinterpretcat/lfs/blob/master/scripts/prepare/5.19-make-coreutils.sh#L9) telling that `coreutils`'s tests fail. 😌 at least I am not alone!
 
-### Dealing with Errors
-A brief analysis of the problem surfaced a difficulty in aufs driver which tries to operate with file paths longer than PATH_MAX. The obstacle is hidden in the linux security mechanism - AppArmor. It blocks program operations which deal with extremely long paths.
-
-BTW, the issue also manifests itself during the configuretion step:
+### Errors 
+#### AppArmor and PATH_MAX
+Two tests which result in error show that some operations involve operations with file paths longer than PATH_MAX. These operations are restricted by host's linux security mechanism - AppArmor. 
 ```
-$ ./configure --prefix=/tools --enable-install-program=hostname
+$ dmesg | grep "Failed name look"
+[ 9104.641035] audit: type=1400 audit(1529927897.941:34): apparmor="DENIED" operation="mkdir" info="Failed name lookup - name too long" error=-36 profile="docker-default" name="" pid=19727 comm="perl" requested_mask="c" denied_mask="c" fsuid=1000 ouid=1000
+[ 9104.646367] audit: type=1400 audit(1529927897.946:35): apparmor="DENIED" operation="open" info="Failed name lookup - name too long" error=-36 profile="docker-default" name="" pid=19731 comm="chmod" requested_mask="r" denied_mask="r" fsuid=1000 ouid=1000
+[ 9104.651598] audit: type=1400 audit(1529927897.951:36): apparmor="DENIED" operation="open" info="Failed name lookup - name too long" error=-36 profile="docker-default" name="" pid=19732 comm="rm" requested_mask="r" denied_mask="r" fsuid=1000 ouid=1000
+```
+
+BTW, the issue may also manifest itself during the configuration step:
+```
+$ ./configure --prefix=/tools --enable-install-program=hostname
 checking for a BSD-compatible install... /usr/bin/install -c
 checking whether build environment is sane... yes
 ...
@@ -51,20 +66,45 @@ checking whether build environment is sane... yes
 config.status: creating po/Makefile
 rm: cannot remove 'confdir3/confdir3/confdir3/.../confdir3': File name too long
 ```
-I thought of either trying to configure AppArmor so that it can allow the operation, or ... try other solution with google's help. After failing to find a quick way to tame AppArmor, I found that (of course) somebody faced similar [issues in docker container][app-armor-issue].
-> TODO Learn how to configure AppArmor
+After failing to find a quick way to tame AppArmor, I found that (of course) somebody faced similar [issues in docker container][app-armor-issue]. However, changing the FS driver doesn't help with this specific issue, but fixes 2 other failed tests ;).
+#### Disable AppArmor
+- disable it;
+> TODO how to do it?
+- or create a fancy new profile for docker and use it instead of `docker-default`;
+- or run container as privileged (my way).
 
+#### Priviliged Container
+Instead of bothering with AppArmor, you can run your container with LFS in privileged mode.
+{% highlight bash %}
+docker run -it --privileged <CONTAINER> [...other options]
+{% endhighlight %}
+This command probably runs container with other apparmor profile, which is apparantely not so restrictive as `docker-default`. Here is an [official explanation][docker-priv] and interesting [insight from developers][docker-insight].
+> When the operator executes docker run --privileged, Docker will enable access to all devices on the host as well as set some configuration in AppArmor or SELinux to allow the container nearly all the same access to the host as processes running outside containers on the host.
+
+Now there is no process 'enforced' in `docker-default` domain.
+```
+$ sudo apparmor_status | grep -A 10 "processes are in enforce mode"                                                                                   [14:38:19]
+6 processes are in enforce mode.
+   /sbin/dhclient (1448) 
+   /sbin/dhclient (2288) 
+   /usr/sbin/cups-browsed (15468) 
+   /usr/sbin/cupsd (15467) 
+   /usr/sbin/cupsd (15487) 
+   /usr/sbin/ntpd (3707) 
+0 processes are in complain mode.
+0 processes are unconfined but have a profile defined.
+```
+
+### Failed Tests
+#### aufs vs overlay
 Here is the [documentation][docker-overlay2] how to change docker storage driver. Don't forget to enter extra command to make the backup. 
-After changing the driver some of failed tests are passing.
-
+After changing the driver 2 out of 3 failed tests are passing now:
 ```
 $ grep -E "(ERROR|FAIL) " tests/test-suite.log  
 FAIL tests/tail-2/inotify-dir-recreate.sh (exit status: 1)
 ERROR tests/rm/deep-2.sh (exit status: 99)
 ERROR tests/du/long-from-unreadable.sh (exit status: 99)
 ```
-
-### Failed Tests
 #### inotify-dir-recreate
 The idea behind the test according to it's source [script](https://github.com/coreutils/coreutils/blob/v8.29/tests/tail-2/inotify-dir-recreate.sh):
 
@@ -76,9 +116,9 @@ The idea behind the test according to it's source [script](https://github.com/co
 {% endhighlight %}
 
 To see the output of the test run the command:
-```
+{% highlight bash %}
 make check TESTS=tests/tail-2/inotify-dir-recreate KEEP=yes VERBOSE=yes
-```
+{% endhighlight %}
 Test fails because it's output is not as expected. It expects:
 ``` 
 $ cat gt-inotify-dir-recreate.sh.7W1d/exp
@@ -90,11 +130,11 @@ tail: 'dir/file' has appeared;  following new file
 ``` 
 Results contain only the first line which is the standard output. Errors are not captured via stream redirection in my shell in the docker container. To see errors from a program I need to launch it manually. Here is the behavior I get in docker:
 
-![Coreutils test fail in docker](/assets/img/coreutils-test-fail-in-docker.gif)
+![Coreutils test fail in docker]({{ site.baseurl }}/assets/img/coreutils-test-fail-in-docker.gif)
 
 The expected behavior can be reproduced on the host. However, the default `tail` in my environment doesn't switch to polling either. So I copied, configured and run `make` to get the `tail` binary from the `coreutils` archive which is used in LFS.
 
-![How it should work](/assets/img/coreutils-should-work.gif)
+![How it should work]({{ site.baseurl }}/assets/img/coreutils-should-work.gif)
 
 Basically, `tail` should output more info to the console, and apparently it doesn't do it. And the reason why `tail` is not switching to polling is that linux inotify API is not used by tail as expected. All files inside container are treated as "remote". In the main() of `tail` there is a check, verifying if the watched file is located on a remote FS. If file is remote, than inotify is not used at all, and thus we cannot get that message. 
 
@@ -145,10 +185,18 @@ if (forever && ignore_fifo_and_pipe (F, n_files))
 1. Explain what is polling, brief inotify documentation 
 2. inotifywait example with removal -> explains why file removal should switch to polling
 
+## Conclusions
+{: #conclusions }
+1. To avoid any problems with building LFS run container in privileged mode. This is the reason why 2 test result in error.
+2. Three failed tests are pretty much harmless. 
+
 [lfs-main]:        http://www.linuxfromscratch.org/lfs/
 [lfs-coreutils]:   http://www.linuxfromscratch.org/lfs/view/stable/chapter05/coreutils.html
 [app-armor-issue]: https://github.com/moby/moby/issues/13451
 [docker-overlay2]: https://docs.docker.com/storage/storagedriver/overlayfs-driver/#configure-docker-with-the-overlay-or-overlay2-storage-driver
+[docker-priv]:	   https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities
+[docker-insight]:  https://blog.docker.com/2013/09/docker-can-now-run-within-docker/
+[docker-storage]:  https://docs.docker.com/storage/
 ----
 ### References
 - [LFS][lfs-main]
