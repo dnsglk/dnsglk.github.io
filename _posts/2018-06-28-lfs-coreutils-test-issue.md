@@ -16,7 +16,7 @@ TL;DR just go to [Conclusions](#conclusions) section.
 
 This post is about a lesson learned from *NOT* learning the docker's [official documentation][docker-storage] before starting doing something with it!
 
-To understand what's happening first read [this post]({{ site.baseurl }}{% link _drafts/lfs-kickoff.md %}).
+To understand what's happening first read [this post]({{ site.baseurl }}{% link _posts/2018-06-28-lfs-kickoff.md %}).
 
 ## Issue
 3 tests fail when running `make check` under docker and 2 return with error. 
