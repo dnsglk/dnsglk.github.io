@@ -1,8 +1,9 @@
 ---
 layout:		post
-title: 		"LFS and docker"
+title: 		"LFS in docker"
 categories: 	lfs
-date:		2018-06-01
+date:		2018-06-28
+tags:           [LFS, lfs, linux, docker]
 ---
 
 One day I stumbled upon [LFS][lfs] and decided to make it in a docker
