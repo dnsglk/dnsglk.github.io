@@ -47,7 +47,7 @@ In comparison, running the check on the host doesn't yield any issue.
 
 ### Errors 
 #### AppArmor and PATH_MAX
-Two tests which result in error show that some operations involve operations with file paths longer than PATH_MAX. These operations are restricted by host's linux security mechanism - AppArmor. 
+Two tests, which result in error, show that some operations juggle the filepaths longer than [PATH_MAX](https://eklitzke.org/path-max-is-tricky). These operations are restricted by host's linux security mechanism - AppArmor. 
 ```
 $ dmesg | grep "Failed name look"
 [ 9104.641035] audit: type=1400 audit(1529927897.941:34): apparmor="DENIED" operation="mkdir" info="Failed name lookup - name too long" error=-36 profile="docker-default" name="" pid=19727 comm="perl" requested_mask="c" denied_mask="c" fsuid=1000 ouid=1000
@@ -57,7 +57,7 @@ $ dmesg | grep "Failed name look"
 
 BTW, the issue may also manifest itself during the configuration step:
 ```
-$ ./configure --prefix=/tools --enable-install-program=hostname
+$ ./configure --prefix=/tools --enable-install-program=hostname
 checking for a BSD-compatible install... /usr/bin/install -c
 checking whether build environment is sane... yes
 ...
@@ -66,15 +66,15 @@ checking whether build environment is sane... yes
 config.status: creating po/Makefile
 rm: cannot remove 'confdir3/confdir3/confdir3/.../confdir3': File name too long
 ```
-After failing to find a quick way to tame AppArmor, I found that (of course) somebody faced similar [issues in docker container][app-armor-issue]. However, changing the FS driver doesn't help with this specific issue, but fixes 2 other failed tests ;).
-#### Disable AppArmor
-- disable it;
-> TODO how to do it?
-- or create a fancy new profile for docker and use it instead of `docker-default`;
-- or run container as privileged (my way).
+After failing to find a quick way to tame AppArmor, I found that (of course) somebody faced similar [issues in docker container][app-armor-issue]. However, changing the FS driver doesn't help with this specific issue, but fixes 2 other failed tests. 😏
+
+So, to fix this we can:
+- disable it AppArmor at all;
+- create a new app-armor profile for docker and use it instead of `docker-default`;
+- or run container as privileged (my choice).
 
 #### Priviliged Container
-Instead of bothering with AppArmor, you can run your container with LFS in privileged mode.
+Instead of bothering with AppArmor, you can run your container in privileged mode. 
 {% highlight bash %}
 docker run -it --privileged <CONTAINER> [...other options]
 {% endhighlight %}
@@ -97,8 +97,7 @@ $ sudo apparmor_status | grep -A 10 "processes are in enforce mode"             
 
 ### Failed Tests
 #### aufs vs overlay
-Here is the [documentation][docker-overlay2] how to change docker storage driver. Don't forget to enter extra command to make the backup. 
-After changing the driver 2 out of 3 failed tests are passing now:
+2 out of 3 failed tests can pass if the `aufs` docker driver is changed to `overlay2`. Here is the [documentation][docker-overlay2] how to change docker storage driver. Don't forget to enter extra command to make the backup. Now it's better:
 ```
 $ grep -E "(ERROR|FAIL) " tests/test-suite.log  
 FAIL tests/tail-2/inotify-dir-recreate.sh (exit status: 1)
@@ -106,7 +105,7 @@ ERROR tests/rm/deep-2.sh (exit status: 99)
 ERROR tests/du/long-from-unreadable.sh (exit status: 99)
 ```
 #### inotify-dir-recreate
-The idea behind the test according to it's source [script](https://github.com/coreutils/coreutils/blob/v8.29/tests/tail-2/inotify-dir-recreate.sh):
+Another test which fails is tail-2/inotify-dir-recreate. The idea behind the test according to it's source [script](https://github.com/coreutils/coreutils/blob/v8.29/tests/tail-2/inotify-dir-recreate.sh) is
 
 {% highlight bash %}
 #!/bin/sh 
@@ -119,7 +118,7 @@ To see the output of the test run the command:
 {% highlight bash %}
 make check TESTS=tests/tail-2/inotify-dir-recreate KEEP=yes VERBOSE=yes
 {% endhighlight %}
-Test fails because it's output is not as expected. It expects:
+The test fails because it's output is not as expected. It expects:
 ``` 
 $ cat gt-inotify-dir-recreate.sh.7W1d/exp
 inotify
@@ -128,15 +127,27 @@ tail: directory containing watched file was removed
 tail: inotify cannot be used, reverting to polling
 tail: 'dir/file' has appeared;  following new file
 ``` 
-Results contain only the first line which is the standard output. Errors are not captured via stream redirection in my shell in the docker container. To see errors from a program I need to launch it manually. Here is the behavior I get in docker:
+Instead, there is only one line from `stdout`:
+```
+$ cat gt-inotify-dir-recreate.sh.Fm7C/out
+inotify
+```
+Errors are not captured via stream redirection for some reason. To see the errors from a program I run the test manually. Here is what I get inside the docker:
 
 ![Coreutils test fail in docker]({{ site.baseurl }}/assets/img/coreutils-test-fail-in-docker.gif)
 
-The expected behavior can be reproduced on the host. However, the default `tail` in my environment doesn't switch to polling either. So I copied, configured and run `make` to get the `tail` binary from the `coreutils` archive which is used in LFS.
+As for the expected behavior, it can be achieved on the host's side. However, the default `tail` doesn't switch to polling either. So I built `tail` binary from `coretuils` sources:
 
 ![How it should work]({{ site.baseurl }}/assets/img/coreutils-should-work.gif)
 
-Basically, `tail` should output more info to the console, and apparently it doesn't do it. And the reason why `tail` is not switching to polling is that linux inotify API is not used by tail as expected. All files inside container are treated as "remote". In the main() of `tail` there is a check, verifying if the watched file is located on a remote FS. If file is remote, than inotify is not used at all, and thus we cannot get that message. 
+Basically, `tail` should tell that it abandons inotify API and should use polling when the file is removed. 
+
+There is a cool [intro to inotify API][linux-api] which is good to familiarize with. 
+
+From inotify manual page:
+> Inotify  reports  only  events that a user-space program triggers through the filesystem API.  As a result, it does not catch remote events that occur on network filesystems. Applications must fall back to polling the filesystem to catch such events.)  Furthermore, various pseudo-filesystems such as /proc, /sys, and /dev/pts are  not  monitorable with inotify.
+
+And the reason why `tail` is not switching to polling is that  it's already using it! inotify API is not used by tail as expected at all! Since I build packages inside container's writable layer all files there are treated as "remote". In the main() of `tail` there is a check, verifying if the watched file is located on a remote FS. If it's true, then program defaults to polling. Thus we cannot get the message about reverting to polling. 
 
 {% highlight c %}
 if (forever && ignore_fifo_and_pipe (F, n_files))
@@ -181,14 +192,16 @@ if (forever && ignore_fifo_and_pipe (F, n_files))
 
 `overlayfs2` and `aufs`, which are used by docker, are considered as remote FS. Look at the [tail.c](https://github.com/coreutils/coreutils/blob/v8.29/src/tail.c#L2039) and locally generated file `fs-is-local.h`.
 
-# ... continue 
-1. Explain what is polling, brief inotify documentation 
-2. inotifywait example with removal -> explains why file removal should switch to polling
+#### Docker Volumes
+It only occurred to me afterwards that these FS issues can be avoided if all the build-related work is done in docker volumes. 🤦. Volumes are available by the means of the same FS which the host's dir is located on.
+> Ideally, very little data is written to a container’s writable layer, and you use Docker volumes to write data. 
+
+> A volume is a specially-designated directory within one or more containers that bypasses the Union File System. 
 
 ## Conclusions
 {: #conclusions }
-1. To avoid any problems with building LFS run container in privileged mode. This is the reason why 2 test result in error.
-2. Three failed tests are pretty much harmless. 
+0. Use volumes instead of container writable layer to avoid any issues with running tests or building the project.
+1. Run container in privileged mode to avoid any possible problems with building LFS.
 
 [lfs-main]:        http://www.linuxfromscratch.org/lfs/
 [lfs-coreutils]:   http://www.linuxfromscratch.org/lfs/view/stable/chapter05/coreutils.html
@@ -197,8 +210,10 @@ if (forever && ignore_fifo_and_pipe (F, n_files))
 [docker-priv]:	   https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities
 [docker-insight]:  https://blog.docker.com/2013/09/docker-can-now-run-within-docker/
 [docker-storage]:  https://docs.docker.com/storage/
+[linux-api]:	   https://lwn.net/Articles/604686/
 ----
 ### References
 - [LFS][lfs-main]
 - [Coreutils](https://github.com/coreutils/coreutils/)
 - [AppArmor and docker issue][app-armor-issue]
+- [Intro to inotify API][linux-api]
