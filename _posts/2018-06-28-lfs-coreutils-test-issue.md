@@ -1,7 +1,7 @@
 ---
 layout: 	post
 title:  	"LFS. Coreutils issues."
-date:   	2018-06-28 
+date:   	2018-06-28 16:00
 categories: 	lfs
 tags:		[LFS, lfs, linux, docker]
 ---
