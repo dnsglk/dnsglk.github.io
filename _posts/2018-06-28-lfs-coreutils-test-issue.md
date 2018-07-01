@@ -198,10 +198,39 @@ It only occurred to me afterwards that these FS issues can be avoided if all the
 
 > A volume is a specially-designated directory within one or more containers that bypasses the Union File System. 
 
+Now let's build `coreutils` inside the volume (new container) and run tests again.
+
+```
+============================================================================
+Testsuite summary for GNU coreutils 8.29
+============================================================================
+# TOTAL: 603
+# PASS:  482
+# SKIP:  120
+# XFAIL: 0
+# FAIL:  1
+# XPASS: 0
+# ERROR: 0
+============================================================================
+```
+
+Now another test fails - [df-symlink](https://github.com/coreutils/coreutils/blob/master/tests/df/df-symlink.sh). The first step of the test checks that `df` shows the same filesystem and mount point when given device file or symlink to that file. The second check is the same, except that now symlink is changed to the '.' (current directory). Test fails on the second step due to the specifics of [get_disk()](https://github.com/coreutils/coreutils/blob/v8.29/src/df.c#L1259) method. In the case if one FS is mounted several times on different mount entries, `df` chooses the shortest mount point to print in the results table! The mount point path for docker volume I choose was longer, than one those default mounts automatically created by docker. In my case, `/home/lfs/work/sources/coreutils-8.29` was longer than `/etc/hosts`. Yeah, `docker` makes some mounts for you:
+
+```
+$ mount | grep /dev/sda7
+/dev/sda7 on /home/lfs/work/ type ext4 (rw,relatime,errors=remount-ro,data=ordered)
+/dev/sda7 on /etc/resolv.conf type ext4 (rw,relatime,errors=remount-ro,data=ordered)
+/dev/sda7 on /etc/hostname type ext4 (rw,relatime,errors=remount-ro,data=ordered)
+/dev/sda7 on /etc/hosts type ext4 (rw,relatime,errors=remount-ro,data=ordered)
+```
+
+This issue is gone when a shorter than `/etc/hosts` mount point is chosen for the volume. For example, simply `/work`.
+
 ## Conclusions
 {: #conclusions }
 0. Use volumes instead of container writable layer to avoid any issues with running tests or building the project.
 1. Run container in privileged mode to avoid any possible problems with building LFS.
+2. Learn `docker` documentation to avoid issues in the future!
 
 [lfs-main]:        http://www.linuxfromscratch.org/lfs/
 [lfs-coreutils]:   http://www.linuxfromscratch.org/lfs/view/stable/chapter05/coreutils.html
