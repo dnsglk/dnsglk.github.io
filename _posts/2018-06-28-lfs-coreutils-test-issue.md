@@ -1,9 +1,9 @@
 ---
 layout: 	post
-title:  	"LFS. Coreutils issues."
+title:  	"LFS in docker, preparation: coreutils check fails."
 date:   	2018-06-28 16:00
 categories: 	lfs
-tags:		[LFS, lfs, linux, docker]
+tags:		[LFS, lfs, linux, docker, coreutils]
 ---
 ### Prerequisites 
 - [LFS 8.2][lfs-main] 
