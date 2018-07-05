@@ -1,6 +1,6 @@
 ---
 layout:		post
-title: 		"LFS in docker"
+title: 		"LFS in docker."
 categories: 	lfs
 date:		2018-06-28 12:00
 tags:           [LFS, lfs, linux, docker]

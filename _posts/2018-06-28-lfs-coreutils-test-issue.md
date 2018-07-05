@@ -1,6 +1,6 @@
 ---
 layout: 	post
-title:  	"LFS in docker, preparation: coreutils check fails."
+title:  	"LFS in docker. Preparation: coreutils check fails."
 date:   	2018-06-28 16:00
 categories: 	lfs
 tags:		[LFS, lfs, linux, docker, coreutils]

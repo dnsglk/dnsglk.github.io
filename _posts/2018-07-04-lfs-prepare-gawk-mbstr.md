@@ -1,5 +1,5 @@
 ---
-title: "LFS in docker, preparation: gawk check fails."
+title: "LFS in docker. Preparation: gawk check fails."
 date:   2018-07-04
 categories:     lfs
 tags:   [LFS, lfs, linux, gawk, docker]
