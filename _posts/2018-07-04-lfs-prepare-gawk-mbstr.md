@@ -142,6 +142,8 @@ __ctype_get_mb_cur_max (void)
 }
 {% endhighlight %}
 
+### Correct locale
+
 Before the moment when `gawk_mb_cur_max` is initialized in the `gawk`'s `main` there are other activities. One particular line attracted my attention.
 
 {% highlight c %}
@@ -160,7 +162,6 @@ set_locale_stuff(void)
 ...
 {% endhighlight %}
 
-### Correct locale
 An idea came to me that this line has something to do with the number change. When I run the `gawk`'s test routine on my host environment it doesn't fail. The locales on the host and in docker are, of course, different. `docker`'s has `LC_ALL=POSIX` due to LFS book instructions. On the host: 
 
 ```
