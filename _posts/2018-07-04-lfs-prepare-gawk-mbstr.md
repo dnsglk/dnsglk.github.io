@@ -112,7 +112,7 @@ Before every call the program uses a check `gawk_mb_cur_max > 1`. It looks like 
 {% endhighlight %}
 
 ### glibc
-Thanks to the hint from the comment, now we infer that it's a `glibc` function. How does it look like? 
+Thanks to the hint from the comment, it's clear now that it's a `glibc` function. How does it look like? 
 
 ```
 $ echo -e "#include <stdlib.h> \n int main() {}" > 1.c
@@ -144,7 +144,7 @@ __ctype_get_mb_cur_max (void)
 
 ### Correct locale
 
-Before the moment when `gawk_mb_cur_max` is initialized in the `gawk`'s `main` there are other activities. One particular line attracted my attention.
+Other activities take place before the moment of `gawk_mb_cur_max` initialization in the `gawk`'s `main`. One particular line attracted my attention.
 
 {% highlight c %}
         set_locale_stuff();
@@ -195,10 +195,10 @@ $ gcc 1.c
 $ ./a.out
 6
 ```
-The size of multibyte char in 'C.UTF-8' is `6`. For plain 'C' locale it returns `1`.
+The max size of multibyte char in 'C.UTF-8' is `6`. For plain 'C' locale it returns `1`.
 
 ## Conclusions
-The two failed tests which check multibyte scenarios can be safely ignored, since it has nothing to do with bugs, but with locale used when gawk is running.
+The two failed tests which check multibyte scenarios can be safely ignored. It's obviously not a bug, but a question of the locale used when gawk is running.
 
 [lfs-main]: http://www.linuxfromscratch.org/lfs/view/8.2/
 [lfs-gawk]: http://www.linuxfromscratch.org/lfs/view/8.2/chapter05/gawk.html
