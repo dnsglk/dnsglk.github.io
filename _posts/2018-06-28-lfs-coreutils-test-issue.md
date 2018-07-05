@@ -232,8 +232,8 @@ This issue is gone when a shorter than `/etc/hosts` mount point is chosen for th
 1. Run container in privileged mode to avoid any possible problems with building LFS.
 2. Learn `docker` documentation to avoid issues in the future!
 
-[lfs-main]:        http://www.linuxfromscratch.org/lfs/
-[lfs-coreutils]:   http://www.linuxfromscratch.org/lfs/view/stable/chapter05/coreutils.html
+[lfs-main]:        http://www.linuxfromscratch.org/lfs/view/8.2/
+[lfs-coreutils]:   http://www.linuxfromscratch.org/lfs/view/8.2/chapter05/coreutils.html
 [app-armor-issue]: https://github.com/moby/moby/issues/13451
 [docker-overlay2]: https://docs.docker.com/storage/storagedriver/overlayfs-driver/#configure-docker-with-the-overlay-or-overlay2-storage-driver
 [docker-priv]:	   https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities
