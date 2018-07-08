@@ -42,3 +42,6 @@ plugins:
 
 google_analytics: UA-121586326-1
 google_site_verification:    Q3EF5MYVlhHzFVRJJSBc9_CcIRHjJWUzGsFRxqH1XXU 
+
+disqus:
+    shortname: dnsglk
