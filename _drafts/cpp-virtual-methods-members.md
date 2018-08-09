@@ -1,6 +1,6 @@
 ---
 layout:         post
-title:          C++: call a pointer to a virtual member method.
+title:          "C++. Call a pointer to a virtual member method."
 date:           2018-08-09 12:00
 categories:     cpp
 tags:           [C++, c++, cxx, cpp, programming, vptr, virtual method]
@@ -67,14 +67,18 @@ int main() {
 }
 {% endhighlight %}
 
+Do you have any doubt about the `slave2.doForUs()`? Does the `&Work::cook` make you uncertain?
+
 ## It's a shame not to know this trivial thing!
 
-Oh no, it's not. It's a joke. When I met the similar code in my work project, the second case wasn't obvious to me. It was a long time since I used C++ and as one knows this language is not an easy. BTW this [Scott Meyer's video](https://www.youtube.com/watch?v=KAWA1DuvCnQ) soothed my worry of being ignorant. 
+Oh no, it's not. It's a joke. When I met the similar code in my work project, the second case wasn't so obvious to me. Even though the `cook()` is virtual, the very specific method address is used during the delegation. It was a long time since I used C++, and as one knows this language is not an easy one. BTW this [Scott Meyer's video](https://www.youtube.com/watch?v=KAWA1DuvCnQ) soothed my worry of being ignorant. 
 
-Lets return to the question. The first one should be something like this:
-- asd
-- das
-- asd
+Lets return to the question. The `slave1.doForUs()` call, I guess, should be explained like this:
+- `OurSlaveType` stores a pointer to a super class.
+- `Work::clean()` is not virtual. 
+- Hence, the super class's version of `clean()` is expected to be used.
+
+What happens with the `slave2.doForUs()` call? Should the same logic be applied here, i.e. should we expect `PainfulWork::cook()` to be called since it's virtual? But why not `Work::cook()` if the address of this specific method is explicitely passed as an argument?
 
 ## I don't believe and want to use gdb
 

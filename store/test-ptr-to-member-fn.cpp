@@ -26,7 +26,7 @@ public:
     virtual ~Work() {}
 
             void clean(int, int) { std::cout << "Work::clean\n"; }
-    virtual void cook(int, int) { std::cout << "Work::cook\n"; }
+    virtual void cook (int, int) { std::cout << "Work::cook\n";  }
 };
 
 class PainfulWork : public Work {
@@ -36,11 +36,10 @@ public:
     virtual ~PainfulWork() {}
 
             void clean(int, int) { std::cout << "PainfulWork::clean\n"; }
-    virtual void cook(int, int) { std::cout << "PainfulWork::cook\n"; }
+    virtual void cook (int, int) { std::cout << "PainfulWork::cook\n";  }
 };
 
 int main() {
-
     std::unique_ptr<Work>        work(new Work());
     std::unique_ptr<PainfulWork> painfulWork(new PainfulWork());
 
