@@ -69,9 +69,9 @@ rm: cannot remove 'confdir3/confdir3/confdir3/.../confdir3': File name too long
 After failing to find a quick way to tame AppArmor, I found that (of course) somebody faced similar [issues in docker container][app-armor-issue]. However, changing the FS driver doesn't help with this specific issue, but fixes 2 other failed tests. 😏
 
 So, to fix this we can:
-- disable it AppArmor at all;
-- create a new app-armor profile for docker and use it instead of `docker-default`;
-- or run container as privileged (my choice).
+- disable the AppArmor at all
+- create a new AppArmor profile for docker and use it instead of `docker-default`
+- run a privileged container
 
 #### Priviliged Container
 Instead of bothering with AppArmor, you can run your container in privileged mode. 
