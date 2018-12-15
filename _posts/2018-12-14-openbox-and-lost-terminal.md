@@ -13,16 +13,16 @@ There was a workaround, but still uncomfortable: after all windows where minimiz
 
 <iframe width="420" height="315" src="https://goo.gl/NeLhuJ" allowfullscreen></iframe>
 
-How does one approach this matter? Well, if you have enough experience either with `Openbox` or any window manager, probably you already know what's wrong or what it might be. If there was no prior acquaintance with the software, then, perhaps, one would search similar problem on the net. However, I had a strong believe that it was a real bug, and repairing `Openbox` would earn me something. 
+How does one approach this matter? Well, if you have enough experience either with `Openbox` or any window manager, probably you already know what's wrong or what it might be. If there was no prior acquaintance with the software, then, perhaps, one would search similar problem on the net. However, I had a strong believe that it was a real bug, and debugging `Openbox` and possibly repairing would earn me a small achievement. 
 
 ### How it was fixed
-I had already tweaked `Openbox` configuration only a little bit - added few key mappings to my taste. However, I didn't know that it was enough to add few lines there in order to get what I wanted. So, first of all I knew that I had to get a debug version of the binary. After the binary is built, it needs to be run somehow. Debugging window manager from it's running session is not possible, since the breakpoint will hang it. It means that you need a second running `Openbox` on the machine (if you do not run it remotely, of course). It is not difficult at all to have several window managers running simultaneously. You just need to switch to another linux virtual terminal (Ctrl+Alt+F\<#\>), and type
+I had already tweaked `Openbox` configuration a little bit - added few key mappings to my taste. However, I didn't know that it was enough to add few lines there in order to get what I wanted. So, first of all, before debugging the app I had to get a debug version of the binary. After the binary was built from sources, the next step was run WM somehow. Debugging WM from it's running session should mostly be useless, since the breakpoints hang either the part or the whole desktop. What I thought of was a second running `Openbox` on the machine (it can be run remotely as well, but it's not my case). It is not difficult at all to have several window managers running simultaneously. You just need to switch to another linux virtual terminal (Ctrl+Alt+F\<#\>), and type
 ```
 startx lxsession -- :1 vt6
 ``` 
 `lxsession` is 'the standard session manager used by LXDE. LXSession automatically starts a set of applications and sets up a working desktop environment.' `:1` is next display/server number, because :0 is used by already running system. `vt6` is the number of virtual terminal I switched to. 
 
-After the new desktop is running, we are ready to debug it. I chose the combination of `eclipse` and `gdbserver`, because it seemed more comfortable to debug `Openbox` with the help of GUI. However, when I tried to attach `gdb`, it told me that it's not possible:
+After the new desktop is running, we are ready to debug it. I chose the combination of `eclipse` and `gdbserver`. However, when I tried to attach `gdbserver`, it told me the following:
 ```
 $ gdbserver localhost:6666 --attach 32639     
 Cannot attach to process 32639: Operation not permitted (1)
@@ -38,7 +38,7 @@ again as the root user.  For more details, see /etc/sysctl.d/10-ptrace.conf
 ptrace: Operation not permitted.
 (gdb) 
 ```
-After reading kernel's documentation, I was suprised that I had never encountered ever during my debugging experience. Anyway, I knew what I did and temporarily disabled this security measure.
+After reading kernel's documentation, I was suprised that I had never ever encountered this during my debugging experience. Anyway, I temporarily disabled this security measure.
 
 Finally, I had `eclipse` attached to `Openbox` via gdbserver. It didn't take much time to find the place where the switch list was generated. I just serached for related words in the code and 'focus' led me to 
 
