@@ -9,9 +9,9 @@ tags:           [linux,openbox,terminal]
 ## Intro 
 It always happens to me, that if I want to change something in my linux environment, it is never a piece of cake. My recent experience with switching desktop environment from Kubuntu to LXDE wasn't an easy walk. Though I managed to overcome the transition, several small bugs still annoyed me. For instance, during the change of windows with `Alt-Tab` my terminal disappeared from the list. And it's wasn't possible to get the terminal except for manually minimizing all windows. LXDE taskbar - `lxpanel` - didn't had it as well.  
 
-<iframe width="420" height="315" src="https://goo.gl/NeLhuJ" allowfullscreen></iframe>
-
 There was a workaround, but still uncomfortable: after all windows where minimized several times ('iconified' onto the taskbar), terminal icon appeared again on the windows switch list. But it disappeared again from that list once you switched into it. Thus, it was held to fix the nasty state of things.
+
+<iframe width="420" height="315" src="https://goo.gl/NeLhuJ" allowfullscreen></iframe>
 
 How does one approach this matter? Well, if you have enough experience either with `Openbox` or any window manager, probably you already know what's wrong or what it might be. If there was no prior acquaintance with the software, then, perhaps, one would search similar problem on the net. However, I had a strong believe that it was a real bug, and repairing `Openbox` would earn me something. 
 
